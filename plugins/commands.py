@@ -1038,7 +1038,7 @@ async def all_settings(client, message):
         ]]
         reply_markup=InlineKeyboardMarkup(btn)
         dlt=await message.reply_text(nbbotz, reply_markup=reply_markup, disable_web_page_preview=True)
-        await asyncio.sleep(300)
+        await asyncio.sleep(10800)
         await dlt.delete()
     except Exception as e:
         LOGGER.error(f"Error : {e}")
