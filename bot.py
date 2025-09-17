@@ -2,7 +2,7 @@ import sys
 import glob
 import importlib
 from pathlib import Path
-from pyrogram import idle, __version__
+from pyrogram import idle, __version__ as version
 from pyrogram.raw.all import layer
 import time
 import asyncio
@@ -14,7 +14,7 @@ from database.users_chats_db import db
 from info import *
 from utils import temp
 from Script import script
-from plugins import web_server, check_expired_premium 
+from plugins import web_server, check_expired_premium
 from Lucia.Bot import SilentX
 from Lucia.util.keepalive import ping_server
 from Lucia.Bot.clients import initialize_clients
@@ -46,8 +46,6 @@ def ping_loop():
             LOGGER.error(f"❌ Exception During Ping: {e}")
         time.sleep(120)
 
-threading.Thread(target=ping_loop, daemon=True).start()
-
 async def SilentXBotz_start():
     LOGGER.info('Initializing Your Bot!')
     await SilentX.start()
@@ -68,7 +66,7 @@ async def SilentXBotz_start():
             LOGGER.info(f"Import Plugin - {plugin_name}")
 
     if ON_HEROKU:
-        asyncio.create_task(ping_server()) 
+        asyncio.create_task(ping_server())
 
     b_users, b_chats = await db.get_banned()
     temp.BANNED_USERS = b_users
@@ -90,7 +88,7 @@ async def SilentXBotz_start():
 
     SilentX.loop.create_task(check_expired_premium(SilentX))
 
-    LOGGER.info(f"{me.first_name} with Pyrogram v{__version__} (Layer {layer}) started on {me.username}.")
+    LOGGER.info(f"{me.first_name} with Pyrogram v{version} (Layer {layer}) started on {me.username}.")
     LOGGER.info(script.LOGO)
 
     tz = pytz.timezone('Asia/Kolkata')
@@ -115,7 +113,10 @@ async def SilentXBotz_start():
     app = web.AppRunner(await web_server())
     await app.setup()
     await web.TCPSite(app, "0.0.0.0", PORT).start()
-    LOGGER.info(f"Web server running on http://0.0.0.0:{PORT}/")
+    LOGGER.info(f"Web server running at http://0.0.0.0:{PORT}/")
+
+    # ✅ Start ping loop AFTER web server is running
+    threading.Thread(target=ping_loop, daemon=True).start()
 
     await idle()
 
