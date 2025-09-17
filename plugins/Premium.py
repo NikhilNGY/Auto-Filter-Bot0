@@ -144,7 +144,7 @@ async def plan(client, message):
     ]]
     msg = await message.reply_photo(photo="https://graph.org/file/86da2027469565b5873d6.jpg", caption=script.BPREMIUM_TXT, reply_markup=InlineKeyboardMarkup(btn))
     await client.send_message(PREMIUM_LOGS, log_message)
-    await asyncio.sleep(300)
+    await asyncio.sleep(10800)
     await msg.delete()
     await message.delete()
 
