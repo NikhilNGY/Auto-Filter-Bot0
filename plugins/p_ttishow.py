@@ -15,7 +15,7 @@ from bot import botStartTime
 from logging_helper import LOGGER
 
 
-"""-----------------------------------------https://t.me/SilentXBotz--------------------------------------"""
+"""-----------------------------------------https://t.me/KR_PICTURE-------------------"""
 
 @Client.on_message(filters.new_chat_members & filters.group)
 async def save_group(bot, message):
@@ -75,7 +75,7 @@ async def save_group(bot, message):
                 )
                 
         if settings["auto_delete"]:
-            await asyncio.sleep(600)
+            await asyncio.sleep(10800)
             await (temp.MELCOW['welcome']).delete()
                 
 
