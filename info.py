@@ -43,7 +43,7 @@ support_chat_id = environ.get('SUPPORT_CHAT_ID', '-1001734119324')
 SUPPORT_CHAT_ID = int(support_chat_id) if support_chat_id and id_pattern.search(support_chat_id) else None
 
 DATABASE_URI = environ.get('DATABASE_URI', "")
-DATABASE_NAME = environ.get('DATABASE_NAME', "Filter2")
+DATABASE_NAME = environ.get('DATABASE_NAME', "Autof1")
 COLLECTION_NAME = environ.get('COLLECTION_NAME', 'KR_PICTURE')
 
 # If MULTIPLE_DB Is True Then Fill DATABASE_URI2 Value Else You Will Get Error.
