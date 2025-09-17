@@ -77,7 +77,7 @@ async def start(client, message):
             reply_markup=reply_markup,
             parse_mode=enums.ParseMode.HTML
         )
-        await asyncio.sleep(300)
+        await asyncio.sleep(10800)
         await dlt.delete()
         return         
     if message.chat.type in [enums.ChatType.GROUP, enums.ChatType.SUPERGROUP]:
@@ -94,7 +94,7 @@ async def start(client, message):
         await client.send_message(LOG_CHANNEL, script.LOG_TEXT_P.format(message.from_user.id, message.from_user.mention))
     if len(message.command) != 2:
         buttons = [[
-                    InlineKeyboardButton('⚔   Bᴀᴄᴋ Uᴘ Cʜᴀɴɴᴇʟ  ⚔', url=f'https://t.me/+pCz5eoun5Zk5YzRl')
+                    InlineKeyboardButton('⚔️   Bᴀᴄᴋ Uᴘ Cʜᴀɴɴᴇʟ  ⚔️', url=f'https://t.me/+pCz5eoun5Zk5YzRl')
                 ],[
                     InlineKeyboardButton('🎞 Mᴀɪɴ Gʀᴏᴜᴘ ', url=f"https://t.me/KR_Groups"),
                     InlineKeyboardButton('🆕 Mᴀɪɴ Cʜᴀɴɴᴇʟ ', url="https://t.me/KR_PICTURE")
@@ -204,7 +204,7 @@ async def start(client, message):
                 i += 1
 
             if btn:
-                if message.command[1] != "•  Jᴏɪɴ Uᴘᴅᴀᴛᴇ Cʜᴀɴɴᴇʟ. •":
+                if message.command[1] != "•  Jᴏɪɴ Uᴘᴅᴀᴛᴇ Cʜᴀɴɴᴇʟ  •":
                     btn.append([InlineKeyboardButton("♻️ ᴛʀʏ ᴀɢᴀɪɴ ♻️", url=f"https://t.me/{temp.U_NAME}?start={message.command[1]}")])
                 await client.send_photo(
                     chat_id=message.from_user.id,
