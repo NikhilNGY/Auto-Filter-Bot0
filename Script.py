@@ -261,7 +261,7 @@ Nᴀᴍᴇ : {}
 
 Mᴇꜱꜱᴀɢᴇ : <b>{}</b>"""
     
-    CAPTION = """<b>{file_name}\nUploaded By: <a herf="https://t.me/SilentXBotz">[SilentXBotz]</a></b>"""
+    CAPTION = """<strong><blockquote>Mᴏʀᴇ Mᴏᴠɪᴇꜱ Jᴏɪɴ @sandalwood_kannada_moviesz\n \nTᴇᴀᴍ : @KR_Picture\n \nUᴘʟᴏᴀᴅᴇᴅ Bʏ 👉\nhttps://t.me/+X5CwwZB-jV9iODc1\nhttps://t.me/+X5CwwZB-jV9iODc1</blockquote></strong>"""
 
     IMDB_TEMPLATE_TXT = """
 <b>🏷 Title</b>: <a href={url}>{title}</a>
