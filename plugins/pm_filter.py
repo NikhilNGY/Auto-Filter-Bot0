@@ -1983,12 +1983,12 @@ async def auto_filter(client, msg, spoll=False):
             hehe = await m.edit_photo(photo=imdb.get('poster'), caption=cap, reply_markup=InlineKeyboardMarkup(btn), parse_mode=enums.ParseMode.HTML)
             try:
                 if settings['auto_delete']:
-                    await asyncio.sleep(DELETE_TIME)
+                    await asyncio.sleep(10800)
                     await hehe.delete()
                     await message.delete()
             except KeyError:
                 await save_group_settings(message.chat.id, 'auto_delete', True)
-                await asyncio.sleep(DELETE_TIME)
+                await asyncio.sleep(10800)
                 await hehe.delete()
                 await message.delete()
         except (MediaEmpty, PhotoInvalidDimensions, WebpageMediaEmpty):
@@ -1997,12 +1997,12 @@ async def auto_filter(client, msg, spoll=False):
             hmm = await m.edit_photo(photo=poster, caption=cap, reply_markup=InlineKeyboardMarkup(btn), parse_mode=enums.ParseMode.HTML)
             try:
                if settings['auto_delete']:
-                    await asyncio.sleep(DELETE_TIME)
+                    await asyncio.sleep(10800)
                     await hmm.delete()
                     await message.delete()
             except KeyError:
                 await save_group_settings(message.chat.id, 'auto_delete', True)
-                await asyncio.sleep(DELETE_TIME)
+                await asyncio.sleep(10800)
                 await hmm.delete()
                 await message.delete()
         except Exception as e:
@@ -2010,24 +2010,24 @@ async def auto_filter(client, msg, spoll=False):
             fek = await m.edit_text(text=cap, reply_markup=InlineKeyboardMarkup(btn), parse_mode=enums.ParseMode.HTML)
             try:
                 if settings['auto_delete']:
-                    await asyncio.sleep(DELETE_TIME)
+                    await asyncio.sleep(10800)
                     await fek.delete()
                     await message.delete()
             except KeyError:
                 await save_group_settings(message.chat.id, 'auto_delete', True)
-                await asyncio.sleep(DELETE_TIME)
+                await asyncio.sleep(10800)
                 await fek.delete()
                 await message.delete()
     else:
         fuk = await m.edit_text(text=cap, reply_markup=InlineKeyboardMarkup(btn), disable_web_page_preview=True, parse_mode=enums.ParseMode.HTML)
         try:
             if settings['auto_delete']:
-                await asyncio.sleep(DELETE_TIME)
+                await asyncio.sleep(10800)
                 await fuk.delete()
                 await message.delete()
         except KeyError:
             await save_group_settings(message.chat.id, 'auto_delete', True)
-            await asyncio.sleep(DELETE_TIME)
+            await asyncio.sleep(10800)
             await fuk.delete()
             await message.delete()
 
