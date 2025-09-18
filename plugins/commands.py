@@ -527,32 +527,47 @@ async def settings(client, message):
                 pass
         await message.reply_text('Here Is Your Connected Groups.', reply_markup=InlineKeyboardMarkup(group_list))
                                                                                                             
+from pyrogram import Client, filters, enums
+from info import ADMINS
+from database.connection import add_connection
+from utils import is_check_admin  # make sure you have this helper
 
-@Client.on_message(filters.command('reload'))
-async def connect_group(client, message):
+@Client.on_message(filters.command(["reload", "connect"]))
+async def connect_or_reload(client, message):
     bot_id = client.me.id
     maintenance_mode = await db.get_maintenance_status(bot_id)
+
     if maintenance_mode and message.from_user.id not in ADMINS:
-        await message.reply_text(f"ɪ ᴀᴍ ᴄᴜʀʀᴇɴᴛʟʏ ᴜɴᴅᴇʀ ᴍᴀɪɴᴛᴇɴᴀɴᴄᴇ 🛠️. ɪ ᴡɪʟʟ ʙᴇ ʙᴀᴄᴋ ꜱᴏᴏɴ 🔜. ᴛᴇᴀᴍ: @KR_Picture", disable_web_page_preview=True)
-        return
+        return await message.reply_text(
+            "ɪ ᴀᴍ ᴄᴜʀʀᴇɴᴛʟʏ ᴜɴᴅᴇʀ ᴍᴀɪɴᴛᴇɴᴀɴᴄᴇ 🛠️. ɪ ᴡɪʟʟ ʙᴇ ʙᴀᴄᴋ ꜱᴏᴏɴ 🔜.\nᴛᴇᴀᴍ: @KR_Picture",
+            disable_web_page_preview=True
+        )
+
     user_id = message.from_user.id
+
     if message.chat.type in [enums.ChatType.GROUP, enums.ChatType.SUPERGROUP]:
-        await db.connect_group(message.chat.id, user_id)
-        await message.reply_text("Group Reloaded ✅ Now You Can Manage This Group From PM.")
+        # group chat → auto connect
+        await add_connection(message.chat.id, user_id)
+        await message.reply_text("✅ Group Reloaded. You can now manage this group from PM.")
+    
     elif message.chat.type == enums.ChatType.PRIVATE:
+        # private chat → need group_id
         if len(message.command) < 2:
-            await message.reply_text("Use: /reload <group_id>")
-            return
+            return await message.reply_text("Use: `/connect <group_id>` or `/reload <group_id>`", parse_mode="markdown")
+
         try:
             group_id = int(message.command[1])
+
+            # check admin rights
             if not await is_check_admin(client, group_id, user_id):
-                await message.reply_text("You're Not Admin In That Group.")
-                return
+                return await message.reply_text("⚠️ You're not an admin in that group.")
+
             chat = await client.get_chat(group_id)
-            await db.connect_group(group_id, user_id)
-            await message.reply_text(f"Linked {chat.title} to PM.")
-        except:
-            await message.reply_text("Invalid group ID or error occurred.")
+            await add_connection(group_id, user_id)
+            await message.reply_text(f"✅ Linked **{chat.title}** to PM.")
+
+        except Exception as e:
+            await message.reply_text(f"❌ Invalid group ID or error.\n\nError: `{e}`", parse_mode="markdown")
 
 @Client.on_message((filters.command(["request", "Request"]) | filters.regex("#request") | filters.regex("#Request")) & filters.group)
 async def requests(bot, message):
