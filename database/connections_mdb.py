@@ -1,17 +1,18 @@
 import pymongo
-from info import DATABASE_URI, DATABASE_NAME
 import logging
+from info import DATABASE_URI, DATABASE_NAME
+from pyrogram import Client
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.ERROR)
 
 myclient = pymongo.MongoClient(DATABASE_URI)
 mydb = myclient[DATABASE_NAME]
-mycol = mydb['CONNECTION']
+mycol = mydb["CONNECTION"]
 
 
 # ------------------------------
-# Add connection for user to a group
+# Add connection (link user -> group)
 # ------------------------------
 async def add_connection(group_id, user_id):
     query = mycol.find_one({"_id": user_id})
@@ -24,19 +25,26 @@ async def add_connection(group_id, user_id):
         try:
             mycol.update_one(
                 {"_id": user_id},
-                {"$push": {"group_details": group_details}, "$set": {"active_group": group_id}}
+                {
+                    "$push": {"group_details": group_details},
+                    "$set": {"active_group": group_id},
+                },
             )
             return True
         except Exception:
-            logger.exception('Error adding connection', exc_info=True)
+            logger.exception("Error adding connection", exc_info=True)
             return False
     else:
-        data = {"_id": user_id, "group_details": [group_details], "active_group": group_id}
+        data = {
+            "_id": user_id,
+            "group_details": [group_details],
+            "active_group": group_id,
+        }
         try:
             mycol.insert_one(data)
             return True
         except Exception:
-            logger.exception('Error inserting connection', exc_info=True)
+            logger.exception("Error inserting connection", exc_info=True)
             return False
 
 
@@ -51,13 +59,25 @@ async def active_connection(user_id):
 
 
 # ------------------------------
-# List all connections for a user
+# List all connections for a user (with group titles)
 # ------------------------------
-async def all_connections(user_id):
+async def all_connections(user_id, client: Client = None):
     query = mycol.find_one({"_id": user_id}, {"group_details": 1})
-    if query and "group_details" in query:
-        return [x["group_id"] for x in query["group_details"]]
-    return []
+    if not query or "group_details" not in query:
+        return {}
+
+    connections = {}
+    for item in query["group_details"]:
+        gid = item["group_id"]
+        if client:
+            try:
+                chat = await client.get_chat(gid)
+                connections[gid] = chat.title
+            except Exception:
+                connections[gid] = "Unknown Group"
+        else:
+            connections[gid] = str(gid)
+    return connections
 
 
 # ------------------------------
@@ -89,7 +109,9 @@ async def make_inactive(user_id):
 # ------------------------------
 async def delete_connection(user_id, group_id):
     try:
-        result = mycol.update_one({"_id": user_id}, {"$pull": {"group_details": {"group_id": group_id}}})
+        result = mycol.update_one(
+            {"_id": user_id}, {"$pull": {"group_details": {"group_id": group_id}}}
+        )
         if result.modified_count == 0:
             return False
 
@@ -97,10 +119,19 @@ async def delete_connection(user_id, group_id):
         if query and query.get("group_details"):
             if query.get("active_group") == group_id:
                 last_group_id = query["group_details"][-1]["group_id"]
-                mycol.update_one({"_id": user_id}, {"$set": {"active_group": last_group_id}})
+                mycol.update_one(
+                    {"_id": user_id}, {"$set": {"active_group": last_group_id}}
+                )
         else:
             mycol.update_one({"_id": user_id}, {"$set": {"active_group": None}})
         return True
     except Exception as e:
         logger.exception(f"Error deleting connection: {e}", exc_info=True)
         return False
+
+
+# ------------------------------
+# Wrapper for compatibility with commands.py
+# ------------------------------
+async def remove_connection(group_id, user_id):
+    return await delete_connection(user_id, group_id)
