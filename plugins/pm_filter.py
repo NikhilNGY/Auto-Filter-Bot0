@@ -34,6 +34,7 @@ BUTTON = {}
 BUTTONS = {}
 FRESH = {}
 SPELL_CHECK = {}
+FILTER_CACHE = {}
 
 
 @Client.on_message(filters.group & filters.text & filters.incoming)
@@ -2056,3 +2057,74 @@ async def advantage_spell_chok(client, message):
         await message.delete()
     except:
         pass
+
+async def load_filter_cache(chat_id):
+    """Load filters for a group into memory"""
+    filters_data = await get_filters(chat_id)
+    FILTER_CACHE[chat_id] = {}
+    for keyword in filters_data:
+        FILTER_CACHE[chat_id][keyword.lower()] = await find_filter(chat_id, keyword)
+
+async def check_filters(message_text, chat_id):
+    """Check message text against cached group filters"""
+    text_lower = message_text.lower()
+    if chat_id not in FILTER_CACHE:
+        await load_filter_cache(chat_id)
+    for keyword, data in FILTER_CACHE[chat_id].items():
+        if re.search(rf"(^|\W){re.escape(keyword)}($|\W)", text_lower):
+            return data
+    return None
+
+async def handle_filter(client, message, filter_data):
+    """Send filter response with auto-delete and auto-filter"""
+    settings = await get_settings(message.chat.id)
+    reply_id = message.reply_to_message.id if message.reply_to_message else message.id
+
+    reply_text, btn, alert, fileid = filter_data
+
+    if reply_text:
+        reply_text = reply_text.replace("\\n", "\n").replace("\\t", "\t")
+
+    keyboard = InlineKeyboardMarkup(eval(btn)) if btn and btn != "[]" else None
+
+    try:
+        if fileid and fileid != "None":
+            sent_msg = await message.reply_cached_media(
+                fileid,
+                caption=reply_text or "",
+                reply_markup=keyboard,
+                reply_to_message_id=reply_id
+            )
+        else:
+            sent_msg = await client.send_message(
+                message.chat.id,
+                reply_text or "",
+                disable_web_page_preview=True,
+                reply_markup=keyboard,
+                protect_content=True if settings.get("file_secure") else False,
+                reply_to_message_id=reply_id
+            )
+    except Exception as e:
+        logger.exception(f"Error sending filter response: {e}")
+        return False
+
+    # Run auto-filter if enabled
+    if settings.get("auto_ffilter"):
+        await auto_filter(client, message)
+
+    # Auto-delete after 3 hours
+    if settings.get("auto_delete"):
+        await asyncio.sleep(10800)
+        try:
+            await sent_msg.delete()
+        except:
+            pass
+
+    return True
+
+async def manual_filters(client, message):
+    """Handle manual/group filters only"""
+    filter_data = await check_filters(message.text, chat_id=message.chat.id)
+    if filter_data:
+        return await handle_filter(client, message, filter_data)
+    return False
