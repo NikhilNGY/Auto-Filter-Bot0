@@ -525,21 +525,23 @@ async def settings(client, message):
             except Exception as e:
                 LOGGER.error(f"Error In PM Settings Button - {e}")
                 pass
-        await message.reply_text('Here Is Your Connected Groups.', reply_markup=InlineKeyboardMarkup(group_list))
-                                                                                                            
-from pyrogram import Client, filters, enums
-from info import ADMINS
-from database.connection import add_connection
-from utils import is_check_admin  # make sure you have this helper
+        await message.reply_text('Here Is Your Connected Groups.', reply_markup=InlineKeyboardMarkup(group_list))                                                                                                         
 
-@Client.on_message(filters.command(["reload", "connect"]))
+# ------------------------------
+# Connect or reload group
+# ------------------------------
+@Client.on_message(filters.command(["connect", "reload"]))
 async def connect_or_reload(client, message):
     bot_id = client.me.id
-    maintenance_mode = await db.get_maintenance_status(bot_id)
+    try:
+        maintenance_mode = await db.get_maintenance_status(bot_id)
+    except Exception as e:
+        logger.error(f"DB error: {e}")
+        maintenance_mode = False
 
     if maintenance_mode and message.from_user.id not in ADMINS:
         return await message.reply_text(
-            "ɪ ᴀᴍ ᴄᴜʀʀᴇɴᴛʟʏ ᴜɴᴅᴇʀ ᴍᴀɪɴᴛᴇɴᴀɴᴄᴇ 🛠️. ɪ ᴡɪʟʟ ʙᴇ ʙᴀᴄᴋ ꜱᴏᴏɴ 🔜.\nᴛᴇᴀᴍ: @KR_Picture",
+            "⚠️ I am currently under maintenance 🛠️.\nPlease try again later.\n\nTeam: @KR_Picture",
             disable_web_page_preview=True
         )
 
@@ -548,26 +550,78 @@ async def connect_or_reload(client, message):
     if message.chat.type in [enums.ChatType.GROUP, enums.ChatType.SUPERGROUP]:
         # group chat → auto connect
         await add_connection(message.chat.id, user_id)
-        await message.reply_text("✅ Group Reloaded. You can now manage this group from PM.")
-    
+        return await message.reply_text("✅ Group connected. You can now manage this group from PM.")
+
     elif message.chat.type == enums.ChatType.PRIVATE:
-        # private chat → need group_id
         if len(message.command) < 2:
-            return await message.reply_text("Use: `/connect <group_id>` or `/reload <group_id>`", parse_mode="markdown")
+            return await message.reply_text(
+                "Use: `/connect <group_id>` or `/reload <group_id>`",
+                parse_mode="markdown"
+            )
 
         try:
             group_id = int(message.command[1])
 
-            # check admin rights
             if not await is_check_admin(client, group_id, user_id):
-                return await message.reply_text("⚠️ You're not an admin in that group.")
+                return await message.reply_text("⚠️ You are not an admin in that group.")
 
             chat = await client.get_chat(group_id)
             await add_connection(group_id, user_id)
             await message.reply_text(f"✅ Linked **{chat.title}** to PM.")
 
         except Exception as e:
-            await message.reply_text(f"❌ Invalid group ID or error.\n\nError: `{e}`", parse_mode="markdown")
+            logger.error(f"Connect error: {e}")
+            await message.reply_text(f"❌ Invalid group ID or error.\n\n`{e}`", parse_mode="markdown")
+
+
+# ------------------------------
+# Disconnect group
+# ------------------------------
+@Client.on_message(filters.command("disconnect"))
+async def disconnect_cmd(client, message):
+    user_id = message.from_user.id
+
+    if message.chat.type in [enums.ChatType.GROUP, enums.ChatType.SUPERGROUP]:
+        await remove_connection(message.chat.id, user_id)
+        return await message.reply_text("❌ Group disconnected.")
+
+    elif message.chat.type == enums.ChatType.PRIVATE:
+        if len(message.command) < 2:
+            return await message.reply_text(
+                "Use: `/disconnect <group_id>`",
+                parse_mode="markdown"
+            )
+
+        try:
+            group_id = int(message.command[1])
+            await remove_connection(group_id, user_id)
+            await message.reply_text(f"❌ Disconnected from group `{group_id}`.", parse_mode="markdown")
+        except Exception as e:
+            logger.error(f"Disconnect error: {e}")
+            await message.reply_text(f"❌ Failed to disconnect.\n\n`{e}`", parse_mode="markdown")
+
+
+# ------------------------------
+# List all connections
+# ------------------------------
+@Client.on_message(filters.command("connections"))
+async def connections_cmd(client, message):
+    user_id = message.from_user.id
+
+    try:
+        connections = await all_connections(user_id)
+    except Exception as e:
+        logger.error(f"Connections fetch error: {e}")
+        return await message.reply_text("❌ Error fetching your connections.")
+
+    if not connections:
+        return await message.reply_text("ℹ️ You don’t have any active connections.")
+
+    msg = "🔗 **Your Connections:**\n\n"
+    for group_id, title in connections.items():
+        msg += f"• **{title}** (`{group_id}`)\n"
+
+    await message.reply_text(msg, parse_mode="markdown")
 
 @Client.on_message((filters.command(["request", "Request"]) | filters.regex("#request") | filters.regex("#Request")) & filters.group)
 async def requests(bot, message):
