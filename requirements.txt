@@ -1,30 +1,46 @@
+# Core
 pyrofork==2.3.45
 tgcrypto-pyrofork
+
+# Database
 pymongo[srv]==4.11.1
 motor==3.7.0
-marshmallow==3.26.1
 umongo
+dnspython==2.6.1
+
+# Serialization
+marshmallow==3.26.1
+
+# Utils
 requests
 bs4
-git+https://github.com/Joelkb/cinemagoer
 shortzy
 datetime
 pytz
 aiohttp
-opencv-python-headless==4.8.1.78
-python-dotenv==0.21.1
-speedtest
-humanize
-Pillow
-psutil
-numpy
-wheel
+aiofiles
 ujson
 wget
-aiofiles
-dnspython==2.6.1
+humanize
+python-dotenv==0.21.1
 python-decouple
+
+# Image / Video / Media
+opencv-python-headless==4.8.1.78
+Pillow
 ffmpeg-python==0.2.0
+
+# Performance
+numpy
+psutil
+speedtest
+
+# Templating
 jinja2
+
+# String matching
 fuzzywuzzy
-python-Levenshtein==0.21.0 
+python-Levenshtein==0.21.0
+
+# External git dependency (cinemagoer)
+git+https://github.com/Joelkb/cinemagoer
