@@ -36,36 +36,66 @@ FRESH = {}
 SPELL_CHECK = {}
 FILTER_CACHE = {}
 
-
 @Client.on_message(filters.group & filters.text & filters.incoming)
 async def give_filter(client, message):
     bot_id = client.me.id
+
+    # Emoji reaction if enabled
     if EMOJI_MODE:
         try:
             await message.react(emoji=random.choice(REACTIONS))
         except Exception:
             pass
+
+    # Maintenance mode check
     maintenance_mode = await db.get_maintenance_status(bot_id)
     if maintenance_mode and message.from_user.id not in ADMINS:
-        await message.reply_text(f"ɪ ᴀᴍ ᴄᴜʀʀᴇɴᴛʟʏ ᴜɴᴅᴇʀ ᴍᴀɪɴᴛᴇɴᴀɴᴄᴇ 🛠️. ɪ ᴡɪʟʟ ʙᴇ ʙᴀᴄᴋ ꜱᴏᴏɴ 🔜. ᴛᴇᴀᴍ: @KR_Picture", disable_web_page_preview=True)
+        await message.reply_text(
+            "ɪ ᴀᴍ ᴄᴜʀʀᴇɴᴛʟʏ ᴜɴᴅᴇʀ ᴍᴀɪɴᴛᴇɴᴀɴᴄᴇ 🛠️. ɪ ᴡɪʟʟ ʙᴀᴄᴋ ꜱᴏᴏɴ 🔜. ᴛᴇᴀᴍ: @KR_Picture",
+            disable_web_page_preview=True
+        )
         return
+
+    # Track user messages
     await silentdb.update_top_messages(message.from_user.id, message.text)
-    if message.chat.id != SUPPORT_CHAT_ID:
-        settings = await get_settings(message.chat.id)
-        if settings['auto_ffilter']:
-            if re.search(r'https?://\S+|www\.\S+|t\.me/\S+', message.text):
-                if await is_check_admin(client, message.chat.id, message.from_user.id):
-                    return
-                return await message.delete()   
-            await auto_filter(client, message)
-    else:
-        search = message.text
-        temp_files, temp_offset, total_results = await get_search_results(chat_id=message.chat.id, query=search.lower(), offset=0, filter=True)
+
+    # Settings for this chat
+    settings = await get_settings(message.chat.id)
+
+    # Ignore links if not admin
+    if re.search(r'https?://\S+|www\.\S+|t\.me/\S+', message.text):
+        if not await is_check_admin(client, message.chat.id, message.from_user.id):
+            await message.delete()
+            return
+
+    # Handle manual filters
+    filter_applied = await manual_filters(client, message)
+    if filter_applied:
+        return  # Already handled by manual_filters, exit
+
+    # Auto-filter for non-support groups if enabled
+    if settings.get('auto_ffilter'):
+        await auto_filter(client, message)
+
+    # Support chat behavior
+    if message.chat.id == SUPPORT_CHAT_ID:
+        search = message.text.lower()
+        temp_files, temp_offset, total_results = await get_search_results(
+            chat_id=message.chat.id, query=search, offset=0, filter=True
+        )
         if total_results == 0:
             return
-        else:
-            return await message.reply_text(f"<b>Hᴇʏ {message.from_user.mention},\n\nʏᴏᴜʀ ʀᴇǫᴜᴇꜱᴛ ɪꜱ ᴀʟʀᴇᴀᴅʏ ᴀᴠᴀɪʟᴀʙʟᴇ ✅\n\n📂 ꜰɪʟᴇꜱ ꜰᴏᴜɴᴅ : {str(total_results)}\n🔍 ꜱᴇᴀʀᴄʜ :</b> <code>{search}</code>\n\n<b>‼️ ᴛʜɪs ɪs ᴀ <u>sᴜᴘᴘᴏʀᴛ ɢʀᴏᴜᴘ</u> sᴏ ᴛʜᴀᴛ ʏᴏᴜ ᴄᴀɴ'ᴛ ɢᴇᴛ ғɪʟᴇs ғʀᴏᴍ ʜᴇʀᴇ...\n\n📝 ꜱᴇᴀʀᴄʜ ʜᴇʀᴇ : 👇</b>",   
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔍 ᴊᴏɪɴ ᴀɴᴅ ꜱᴇᴀʀᴄʜ ʜᴇʀᴇ 🔎", url=GRP_LNK)]]))
+        await message.reply_text(
+            f"<b>Hᴇʏ {message.from_user.mention},\n\n"
+            f"ʏᴏᴜʀ ʀᴇǫᴜᴇꜱᴛ ɪꜱ ᴀʟʀᴇᴀᴅʏ ᴀᴠᴀɪʟᴀʙʟᴇ ✅\n\n"
+            f"📂 ꜰɪʟᴇꜱ ꜰᴏᴜɴᴅ : {total_results}\n"
+            f"🔍 ꜱᴇᴀʀᴄʜ : <code>{search}</code>\n\n"
+            f"<b>‼️ ᴛʜɪs ɪs ᴀ <u>sᴜᴘᴘᴏʀᴛ ɢʀᴏᴜᴘ</u> sᴏ ᴛʜᴀᴛ ʏᴏᴜ ᴄᴀɴ'ᴛ ɢᴇᴛ ғɪʟᴇs ғʀᴏᴍ ʜᴇʀᴇ...\n"
+            f"📝 ꜱᴇᴀʀᴄʜ ʜᴇʀᴇ : 👇</b>",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔍 ᴊᴏɪɴ ᴀɴᴅ ꜱᴇᴀʀᴄʜ ʜᴇʀᴇ 🔎", url=GRP_LNK)]
+            ])
+        )
 
 
 @Client.on_message(filters.private & filters.text & filters.incoming)
