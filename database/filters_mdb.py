@@ -43,6 +43,18 @@ async def get_filters(group_id):
 
 
 # ------------------------------
+# Find a single filter
+# ------------------------------
+async def find_filter(group_id, text):
+    mycol = mydb[str(group_id)]
+    try:
+        return mycol.find_one({"text": str(text)})
+    except Exception:
+        logger.exception("Error finding filter", exc_info=True)
+        return None
+
+
+# ------------------------------
 # Delete single filter
 # ------------------------------
 async def delete_filter(message, text, group_id):
