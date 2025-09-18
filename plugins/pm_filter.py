@@ -1850,192 +1850,142 @@ async def cb_handler(client: Client, query: CallbackQuery):
             await query.message.edit_reply_markup(reply_markup)
     await query.answer(MSG_ALRT)
 
+
 async def auto_filter(client, msg, spoll: bool = False):
     """
     Auto Filter Function: Handles normal search and spell-check suggestions.
     """
     try:
-        curr_time = datetime.now(pytz.timezone('Asia/Kolkata')).time()
-
-        # Normal message flow
+        # ---------- NORMAL FLOW ----------
         if not spoll:
             message = msg
-
-            if not message.text:
+            if not (message.text and len(message.text) < 100):
                 return
 
-            # Ignore bot commands or emoji triggers
-            if message.text.startswith("/"):
-                return
-            if re.findall(r"((^\/|^,|^!|^\.|^[\U0001F600-\U000E007F]).*)", message.text):
+            # ignore commands / emoji
+            if message.text.startswith("/") or re.match(r"(^[/,!.]|^[\U0001F600-\U000E007F])", message.text):
                 return
 
-            if len(message.text) < 100:
-                # Preprocess query
-                search = await replace_words(message.text)
-                search = (
-                    search.lower()
-                    .replace("-", " ")
-                    .replace(":", "")
-                )
-                search = re.sub(r"\s+", " ", search).strip()
+            # clean query
+            search = await replace_words(message.text)
+            search = re.sub(r"[\-:]", " ", search.lower())
+            search = re.sub(r"\s+", " ", search).strip()
 
-                m = await message.reply_text(
-                    f"<b>Wᴀɪᴛ {message.from_user.mention} Sᴇᴀʀᴄʜɪɴɢ Yᴏᴜʀ Qᴜᴇʀʏ : <i>{search}...</i></b>",
-                    reply_to_message_id=message.id,
-                )
+            # send "searching" message
+            m = await message.reply_text(
+                f"<b>🔎 Wait {message.from_user.mention}, searching your query: <i>{search}...</i></b>",
+                reply_to_message_id=message.id,
+            )
 
-                files, offset, total_results = await get_search_results(
-                    message.chat.id, search, offset=0, filter=True
-                )
-                settings = await get_settings(message.chat.id)
+            # fetch results
+            files, offset, total_results = await get_search_results(message.chat.id, search, offset=0, filter=True)
+            settings = await get_settings(message.chat.id)
 
-                if not files:
-                    if settings.get("spell_check"):
-                        ai_sts = await m.edit(
-                            "🤖 Pʟᴇᴀꜱᴇ Wᴀɪᴛ, Aɪ Iꜱ Cʜᴇᴄᴋɪɴɢ Yᴏᴜʀ Sᴘᴇʟʟɪɴɢ..."
+            if not files:
+                if settings.get("spell_check"):
+                    ai_sts = await m.edit("🤖 Please wait, AI is checking your spelling...")
+                    suggestion = await ai_spell_check(message.chat.id, search)
+
+                    if suggestion:
+                        await ai_sts.edit(
+                            f"<b>✅ AI Suggested: <code>{suggestion}</code>\nSearching for <code>{suggestion}</code></b>"
                         )
-                        is_misspelled = await ai_spell_check(
-                            chat_id=message.chat.id, wrong_name=search
-                        )
-                        if is_misspelled:
-                            await ai_sts.edit(
-                                f"<b>✅ Aɪ Sᴜɢɢᴇsᴛᴇᴅ: <code>{is_misspelled}</code>\nSᴇᴀʀᴄʜɪɴɢ ғᴏʀ <code>{is_misspelled}</code></b>"
-                            )
-                            await asyncio.sleep(2)
-                            message.text = is_misspelled
-                            await ai_sts.delete()
-                            return await auto_filter(client, message)
+                        await asyncio.sleep(2)
+                        message.text = suggestion
                         await ai_sts.delete()
-                        return await advantage_spell_chok(client, message)
-                else:
-                    pass
-            else:
+                        return await auto_filter(client, message)
+
+                    await ai_sts.delete()
+                    return await advantage_spell_chok(client, message)
+
+                # 🔥 No files & no spell-check → delete and return silently
+                await m.delete()
                 return
 
-        # Polling flow
+        # ---------- POLL FLOW ----------
         else:
             message = msg.message.reply_to_message
             search, files, offset, total_results = spoll
             m = await message.reply_text(
-                f"<b>Wᴀɪᴛ {message.from_user.mention} Sᴇᴀʀᴄʜɪɴɢ Yᴏᴜʀ Qᴜᴇʀʏ : <i>{search}...</i></b>",
+                f"<b>🔎 Wait {message.from_user.mention}, searching your query: <i>{search}...</i></b>",
                 reply_to_message_id=message.id,
             )
             settings = await get_settings(message.chat.id)
             await msg.message.delete()
 
-        # Cache & session tracking
+        # ---------- CACHE ----------
         key = f"{message.chat.id}-{message.id}"
         FRESH[key] = search
         temp.GETALL[key] = files
         temp.SHORT[message.from_user.id] = message.chat.id
 
-        # Build buttons
+        # ---------- BUTTONS ----------
         btn = []
         if settings.get("button"):
             btn = [
-                [
-                    InlineKeyboardButton(
-                        text=f"{silent_size(file.file_size)} | {extract_tag(file.file_name)} {clean_filename(file.file_name)}",
-                        callback_data=f"file#{file.file_id}",
-                    )
-                ]
-                for file in files
+                [InlineKeyboardButton(
+                    f"{silent_size(f.file_size)} | {extract_tag(f.file_name)} {clean_filename(f.file_name)}",
+                    callback_data=f"file#{f.file_id}",
+                )]
+                for f in files
             ]
-        # Add backup channel link
-        btn.insert(
-            0,
-            [
-                InlineKeyboardButton(
-                    "•  Bᴀᴄᴋ Uᴘ Cʜᴀɴɴᴇʟ  •",
-                    url="https://t.me/sandalwood_kannada_moviesz",
-                )
-            ],
-        )
 
-        # Pagination
+        btn.insert(0, [InlineKeyboardButton("• Backup Channel •", url="https://t.me/sandalwood_kannada_moviesz")])
+
         if offset != "":
-            req = message.from_user.id if message.from_user else 0
             try:
-                if settings.get("max_btn"):
-                    per_page = 10
-                else:
-                    per_page = int(MAX_B_TN)
-
-                btn.append(
-                    [
-                        InlineKeyboardButton("Pᴀɢᴇ", callback_data="pages"),
-                        InlineKeyboardButton(
-                            text=f"1/{math.ceil(int(total_results) / per_page)}",
-                            callback_data="pages",
-                        ),
-                        InlineKeyboardButton(
-                            text="Nᴇxᴛ ⋟",
-                            callback_data=f"next_{req}_{key}_{offset}",
-                        ),
-                    ]
-                )
+                per_page = 10 if settings.get("max_btn") else int(MAX_B_TN)
+                total_pages = math.ceil(int(total_results) / per_page)
+                btn.append([
+                    InlineKeyboardButton("Page", callback_data="pages"),
+                    InlineKeyboardButton(f"1/{total_pages}", callback_data="pages"),
+                    InlineKeyboardButton("Next ⋟", callback_data=f"next_{message.from_user.id}_{key}_{offset}"),
+                ])
             except Exception:
                 await save_group_settings(message.chat.id, "max_btn", True)
         else:
-            btn.append(
-                [
-                    InlineKeyboardButton(
-                        text="⚔️  ಕನ್ನಡ ಹೊಸ ಮೂವೀಗಳು   ⚔️",
-                        url="https://t.me/KR_PICTURE",
-                    )
-                ]
-            )
+            btn.append([InlineKeyboardButton("⚔️ ಕನ್ನಡ ಹೊಸ ಮೂವೀಗಳು ⚔️", url="https://t.me/KR_PICTURE")])
 
-        # IMDb integration
-        imdb = (
-            await get_poster(search, file=(files[0]).file_name)
-            if settings.get("imdb")
-            else None
-        )
+        # ---------- CAPTION / IMDb ----------
+        imdb = await get_poster(search, file=files[0].file_name) if settings.get("imdb") else None
 
-        TEMPLATE = script.IMDB_TEMPLATE_TXT
         if imdb:
-            cap = TEMPLATE.format(**imdb, qurey=search, **locals())
+            cap = script.IMDB_TEMPLATE_TXT.format(**imdb, qurey=search, **locals())
             temp.IMDB_CAP[message.from_user.id] = cap
-
             if not settings.get("button"):
-                for file_num, file in enumerate(files, start=1):
-                    cap += f"\n\n<b>{file_num}. <a href='https://telegram.me/{temp.U_NAME}?start=file_{message.chat.id}_{file.file_id}'>{get_size(file.file_size)} | {clean_filename(file.file_name)}</a></b>"
+                for idx, f in enumerate(files, 1):
+                    cap += f"\n\n<b>{idx}. <a href='https://t.me/{temp.U_NAME}?start=file_{message.chat.id}_{f.file_id}'>{get_size(f.file_size)} | {clean_filename(f.file_name)}</a></b>"
         else:
-            cap = f"<b>Hᴇʏ {message.from_user.mention} 👋🏻\n\n➤ Title : {search}\n➤Your Files Ready Now 👇</b>"
+            cap = f"<b>Hey {message.from_user.mention} 👋🏻\n\n➤ Title : {search}\n➤ Your Files Ready 👇</b>"
             if not settings.get("button"):
-                for file_num, file in enumerate(files, start=1):
-                    cap += f"\n<b>{file_num}. <a href='https://telegram.me/{temp.U_NAME}?start=file_{message.chat.id}_{file.file_id}'>{get_size(file.file_size)} | {clean_filename(file.file_name)}</a></b>"
+                for idx, f in enumerate(files, 1):
+                    cap += f"\n<b>{idx}. <a href='https://t.me/{temp.U_NAME}?start=file_{message.chat.id}_{f.file_id}'>{get_size(f.file_size)} | {clean_filename(f.file_name)}</a></b>"
 
-        # Send result
+        # ---------- SEND RESULT ----------
         try:
             if imdb and imdb.get("poster"):
-                hehe = await m.edit_media(
-                    media=InputMediaPhoto(media=imdb.get("poster"), caption=cap, parse_mode=enums.ParseMode.HTML),
+                target_msg = await m.edit_media(
+                    InputMediaPhoto(media=imdb.get("poster"), caption=cap, parse_mode=enums.ParseMode.HTML),
                     reply_markup=InlineKeyboardMarkup(btn),
                 )
-                target_msg = hehe
             else:
                 target_msg = await m.edit_text(
-                    text=cap,
+                    cap,
                     reply_markup=InlineKeyboardMarkup(btn),
                     disable_web_page_preview=True,
                     parse_mode=enums.ParseMode.HTML,
                 )
 
-            # Auto delete
             if settings.get("auto_delete"):
                 await asyncio.sleep(10800)
                 await target_msg.delete()
                 await message.delete()
 
         except (MediaEmpty, PhotoInvalidDimensions, WebpageMediaEmpty):
-            # Retry with fallback poster size
             if imdb and imdb.get("poster"):
-                fallback = imdb.get("poster").replace(".jpg", "._V1_UX360.jpg")
+                fallback = imdb["poster"].replace(".jpg", "._V1_UX360.jpg")
                 target_msg = await m.edit_media(
-                    media=InputMediaPhoto(media=fallback, caption=cap, parse_mode=enums.ParseMode.HTML),
+                    InputMediaPhoto(media=fallback, caption=cap, parse_mode=enums.ParseMode.HTML),
                     reply_markup=InlineKeyboardMarkup(btn),
                 )
                 if settings.get("auto_delete"):
@@ -2043,11 +1993,9 @@ async def auto_filter(client, msg, spoll: bool = False):
                     await target_msg.delete()
                     await message.delete()
         except Exception as e:
-            LOGGER.error(e)
+            LOGGER.error(f"auto_filter send error: {e}")
             target_msg = await m.edit_text(
-                text=cap,
-                reply_markup=InlineKeyboardMarkup(btn),
-                parse_mode=enums.ParseMode.HTML,
+                cap, reply_markup=InlineKeyboardMarkup(btn), parse_mode=enums.ParseMode.HTML
             )
             if settings.get("auto_delete"):
                 await asyncio.sleep(10800)
@@ -2055,69 +2003,53 @@ async def auto_filter(client, msg, spoll: bool = False):
                 await message.delete()
 
     except Exception as e:
-        LOGGER.exception(f"auto_filter error: {e}")
-
-async def ai_spell_check(chat_id, wrong_name):
-    async def search_movie(wrong_name):
-        search_results = imdb.search_movie(wrong_name)
-        movie_list = [movie['title'] for movie in search_results]
-        return movie_list
-    movie_list = await search_movie(wrong_name)
-    if not movie_list:
-        return
-    for _ in range(5):
-        closest_match = process.extractOne(wrong_name, movie_list)
-        if not closest_match or closest_match[1] <= 80:
-            return 
-        movie = closest_match[0]
-        files, offset, total_results = await get_search_results(chat_id=chat_id, query=movie)
-        if files:
-            return movie
-        movie_list.remove(movie)
+        LOGGER.exception(f"auto_filter error: {e}")   
 
 async def advantage_spell_chok(client, message):
     mv_id = message.id
     search = message.text
     chat_id = message.chat.id
     settings = await get_settings(chat_id)
+
+    # Clean query
     query = re.sub(
         r"\b(pl(i|e)*?(s|z+|ease|se|ese|(e+)s(e)?)|((send|snd|giv(e)?|gib)(\sme)?)|movie(s)?|new|latest|br((o|u)h?)*|^h(e|a)?(l)*(o)*|mal(ayalam)?|t(h)?amil|file|that|find|und(o)*|kit(t(i|y)?)?o(w)?|thar(u)?(o)*w?|kittum(o)*|aya(k)*(um(o)*)?|full\smovie|any(one)|with\ssubtitle(s)?)",
-        "", message.text, flags=re.IGNORECASE)
-    query = query.strip() + " movie"
+        "", message.text, flags=re.IGNORECASE
+    ).strip() + " movie"
+
     try:
         movies = await get_poster(search, bulk=True)
     except:
-        k = await message.reply(script.I_CUDNT.format(message.from_user.mention))
-        await asyncio.sleep(10800)
-        await k.delete()
+        # ❌ Instead of replying "I couldn’t find", just stop silently
         try:
             await message.delete()
         except:
             pass
         return
+
     if not movies:
-        google = search.replace(" ", "+")
-        button = [[
-            InlineKeyboardButton("⚔️  ಕನ್ನಡ ಹೊಸ ಮೂವೀಗಳು  ⚔️", url=f"https://t.me/KR_PICTURE")
-        ]]
-        k = await message.reply_text(text=script.I_CUDNT.format(search), reply_markup=InlineKeyboardMarkup(button))
-        await asyncio.sleep(10800)
-        await k.delete()
+        # ❌ Instead of sending "couldn't find", just stop silently
         try:
             await message.delete()
         except:
             pass
         return
+
+    # ✅ If we have movies, build buttons as usual
     user = message.from_user.id if message.from_user else 0
-    buttons = [[
-        InlineKeyboardButton(text=movie.get('title'), callback_data=f"spol#{movie.movieID}#{user}")
-    ]
+    buttons = [
+        [InlineKeyboardButton(text=movie.get('title'), callback_data=f"spol#{movie.movieID}#{user}")]
         for movie in movies
     ]
-    buttons.append(
-        [InlineKeyboardButton(text="🚫 ᴄʟᴏsᴇ 🚫", callback_data='close_data')]
+    buttons.append([InlineKeyboardButton(text="🚫 ᴄʟᴏsᴇ 🚫", callback_data='close_data')])
+
+    d = await message.reply_text(
+        text=script.CUDNT_FND.format(message.from_user.mention),
+        reply_markup=InlineKeyboardMarkup(buttons),
+        reply_to_message_id=message.id
     )
-    d = await message.reply_text(text=script.CUDNT_FND.format(message.from_user.mention), reply_markup=InlineKeyboardMarkup(buttons), reply_to_message_id=message.id)
+
+    # Auto delete suggestion after 60s
     await asyncio.sleep(60)
     await d.delete()
     try:
